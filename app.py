@@ -1,82 +1,127 @@
+import uuid
+from flask_smorest import abort
 from flask import Flask, request
+from db import items, stores
 
 app = Flask(__name__)
-
-# Data structure to hold stores and their items
-stores = [
-    {
-        "name": "My Store",
-        "items": [
-            {
-                "name": "Chair",
-                "price": 15.99
-            }
-        ]
-    }
-]
 
 # Endpoint to get all stores
 @app.get("/store")
 def get_all_stores():
     """
-    Retrieve all stores with their items.
-    Example: GET http://127.0.0.1:5001/store
+    Retrieve a list of all stores.
+    Returns:
+        dict: A dictionary containing all stores in the system.
     """
-    return {"stores": stores}
+    return {"stores": list(stores.values())}
 
 # Endpoint to create a new store
 @app.post("/store")
 def create_store():
     """
-    Create a new store with an empty list of items.
-    Example: POST http://127.0.0.1:5001/store
-    Body: { "name": "New Store" }
+    Create a new store with the provided data.
+    Request Body:
+        - name (str): Name of the store (required).
+    Returns:
+        dict: The newly created store data.
     """
-    request_data = request.get_json()
-    new_store = {"name": request_data["name"], "items": []}
-    stores.append(new_store)
-    return new_store, 201
+    store_data = request.get_json()
+
+    # Validate input data
+    if "name" not in store_data:
+        abort(400, message="Store name is required")
+    
+        for store in store.values():
+            if (store_data["name"] == store["name"]):
+                abort(400, message="Store already exists.")
+
+    # Generate a unique ID for the store
+    store_id = uuid.uuid4().hex
+    store = {**store_data, "id": store_id}
+    stores[store_id] = store
+
+    return store, 201
 
 # Endpoint to add an item to a specific store
-@app.post("/store/<string:name>/item")
-def add_item_to_store(name):
+@app.post("/item")
+def create_item():
     """
-    Add an item to a store.
-    Example: POST http://127.0.0.1:5001/store/My%20Store/item
-    Body: { "name": "Table", "price": 45.99 }
+    Add a new item to a specific store.
+    Request Body:
+        - name (str): Name of the item (required).
+        - price (float): Price of the item (required).
+        - store_id (str): ID of the store to add the item to (required).
+    Returns:
+        dict: The newly created item data.
     """
-    request_data = request.get_json()
-    for store in stores:
-        if store["name"] == name:
-            new_item = {"name": request_data["name"], "price": request_data["price"]}
-            store["items"].append(new_item)
-            return new_item, 201
-    return {"message": "Store not found"}, 404
+    item_data = request.get_json()
 
-# Endpoint to get a store by its name
-@app.get("/store/<string:name>")
-def get_store_by_name(name):
-    """
-    Retrieve a store by its name.
-    Example: GET http://127.0.0.1:5001/store/My%20Store
-    """
-    for store in stores:
-        if store["name"] == name:
-            return store
-    return {"message": "Store not found"}, 404
+    # Validate input data
+    if (
+        "name" not in item_data 
+        or "price" not in item_data 
+        or "store_id" not in item_data
+        ):
+        abort(400, message="Item name, price, and store ID are required")
+        
+    for item in item.values():
+        if (
+            item_data["name"] == item["name"]
+            and item_data["store_id"] == item ["store_id"]
+        ):
+            abort(400, message="Item already exists.")
 
-# Endpoint to get all items in a specific store
-@app.get("/store/<string:name>/item")
-def get_items_in_store(name):
+    # Check if the specified store exists
+    if item_data["store_id"] not in stores:
+        abort(404, message="Store not found")
+
+    # Generate a unique ID for the item
+    item_id = uuid.uuid4().hex
+    item = {**item_data, "id": item_id}
+    items[item_id] = item
+
+    return item, 201
+
+# Endpoint to get all items
+@app.get("/item")
+def get_all_items():
     """
-    Retrieve all items in a store.
-    Example: GET http://127.0.0.1:5001/store/My%20Store/item
+    Retrieve a list of all items.
+    Returns:
+        dict: A dictionary containing all items in the system.
     """
-    for store in stores:
-        if store["name"] == name:
-            return {"items": store["items"]}
-    return {"message": "Store not found"}, 404
+    return {"items": list(items.values())}
+
+# Endpoint to get a store by its ID
+@app.get("/store/<string:store_id>")
+def get_store_by_id(store_id):
+    """
+    Retrieve a specific store by its unique ID.
+    Args:
+        store_id (str): The unique ID of the store.
+    Returns:
+        dict: The store data if found, otherwise an error message.
+    """
+    if store_id not in stores:
+        abort(404, message="Store not found")
+
+    return stores[store_id]
+
+# Endpoint to get an item by its ID
+@app.get("/item/<string:item_id>")
+def get_item(item_id):
+    """
+    Retrieve a specific item by its unique ID.
+    Args:
+        item_id (str): The unique ID of the item.
+    Returns:
+        dict: The item data if found, otherwise an error message.
+    """
+    if item_id not in items:
+        abort(404, message="Item not found")
+
+    return items[item_id]
 
 if __name__ == "__main__":
-    # Start the Flask app with debugging enabled
+    # Start the Flask app with debugging enabled for development
     app.run(debug=True, port=5001)  # Use port 5001

@@ -7,8 +7,8 @@ EXPOSE 5001
 # Set the working directory
 WORKDIR /app
 
-# Install Flask and other dependencies
-RUN pip install flask
+# Install Flask, flask-smorest, and python-dotenv
+RUN pip install flask flask-smorest python-dotenv
 
 # Copy the application code
 COPY . .
