@@ -42,6 +42,37 @@ def create_store():
 
     return store, 201
 
+# Endpoint to get an item by its ID
+@app.delete("/store/<string:store_id>")
+
+def delete_store(store_id):
+    
+    try:
+        del stores[store_id]
+        return {"message":"Store Deleted"}
+    except KeyError:
+        abort(404, message="Store not found")
+
+    return stores[store_id]
+
+
+# Endpoint to get a store by its ID
+
+@app.get("/store/<string:store_id>")
+def get_store_by_id(store_id):
+    """
+    Retrieve a specific store by its unique ID.
+    Args:
+        store_id (str): The unique ID of the store.
+    Returns:
+        dict: The store data if found, otherwise an error message.
+    """
+    if store_id not in stores:
+        abort(404, message="Store not found")
+
+    return stores[store_id]
+
+
 # Endpoint to add an item to a specific store
 @app.post("/item")
 def create_item():
@@ -64,7 +95,7 @@ def create_item():
         ):
         abort(400, message="Item name, price, and store ID are required")
         
-    for item in item.values():
+    for item in items.values():
         if (
             item_data["name"] == item["name"]
             and item_data["store_id"] == item ["store_id"]
@@ -82,30 +113,6 @@ def create_item():
 
     return item, 201
 
-# Endpoint to get all items
-@app.get("/item")
-def get_all_items():
-    """
-    Retrieve a list of all items.
-    Returns:
-        dict: A dictionary containing all items in the system.
-    """
-    return {"items": list(items.values())}
-
-# Endpoint to get a store by its ID
-@app.get("/store/<string:store_id>")
-def get_store_by_id(store_id):
-    """
-    Retrieve a specific store by its unique ID.
-    Args:
-        store_id (str): The unique ID of the store.
-    Returns:
-        dict: The store data if found, otherwise an error message.
-    """
-    if store_id not in stores:
-        abort(404, message="Store not found")
-
-    return stores[store_id]
 
 # Endpoint to get an item by its ID
 @app.get("/item/<string:item_id>")
@@ -121,6 +128,44 @@ def get_item(item_id):
         abort(404, message="Item not found")
 
     return items[item_id]
+
+# Endpoint to get an item by its ID
+@app.delete("/item/<string:item_id>")
+
+def delete_item(item_id):
+    
+    try:
+        del items[item_id]
+        return {"message":"Item Deleted"}
+    except KeyError:
+        abort(404, message="Item not found")
+
+    return items[item_id]
+
+# Endpoint to update the item
+@app.put("/item/<string:item_id>")
+def update_item(item_id):
+    item_data = request.get_json()
+    if "price" not in item_data or "name" not in item_data:
+        abort(400, message= "Bad request. Ensure 'price', and 'name' are included in JSON payload.")
+    try:
+        item = items[item_id]
+        item |= item_data   # |= new update operator in Dictionary
+        
+        return item
+    except KeyError:
+        abort(404,message="Item not found.")
+
+# Endpoint to get all items
+@app.get("/item")
+def get_all_items():
+    """
+    Retrieve a list of all items.
+    Returns:
+        dict: A dictionary containing all items in the system.
+    """
+    return {"items": list(items.values())}
+
 
 if __name__ == "__main__":
     # Start the Flask app with debugging enabled for development
