@@ -60,18 +60,11 @@ def delete_store(store_id):
 
 @app.get("/store/<string:store_id>")
 def get_store_by_id(store_id):
-    """
-    Retrieve a specific store by its unique ID.
-    Args:
-        store_id (str): The unique ID of the store.
-    Returns:
-        dict: The store data if found, otherwise an error message.
-    """
-    if store_id not in stores:
+    try:
+        return stores[store_id]
+    except KeyError:
         abort(404, message="Store not found")
-
-    return stores[store_id]
-
+        
 
 # Endpoint to add an item to a specific store
 @app.post("/item")
@@ -117,17 +110,10 @@ def create_item():
 # Endpoint to get an item by its ID
 @app.get("/item/<string:item_id>")
 def get_item(item_id):
-    """
-    Retrieve a specific item by its unique ID.
-    Args:
-        item_id (str): The unique ID of the item.
-    Returns:
-        dict: The item data if found, otherwise an error message.
-    """
-    if item_id not in items:
-        abort(404, message="Item not found")
-
-    return items[item_id]
+    try:
+        return items[item_id]
+    except KeyError:
+        abort(404, message = "Item not found")
 
 # Endpoint to get an item by its ID
 @app.delete("/item/<string:item_id>")
