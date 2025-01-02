@@ -3,12 +3,15 @@ from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from db import items, stores
+from schemas import ItemSchema, ItemUpdateSchema
 
 # Blueprint for item operations
 blp = Blueprint("Items", __name__, description="Operations on items")
 
 @blp.route("/item/<string:item_id>")
 class Item(MethodView):
+    
+    @blp.response(200, ItemSchema)
     def get(self, item_id):
         """
         Retrieve an item by its ID.
@@ -28,22 +31,16 @@ class Item(MethodView):
         except KeyError:
             abort(404, message="Item not found")
 
-    def put(self, item_id):
+    @blp.arguments(ItemUpdateSchema)
+    @blp.response(200, ItemSchema)
+    def put(self, item_data, item_id):
         """
-        Update an item's data by its ID.
+        Update an existing item by its ID.
         """
-        item_data = request.get_json()
-
-        # Validate input data
-        if "price" not in item_data or "name" not in item_data:
-            abort(
-                400, 
-                message="Bad request. Ensure 'price' and 'name' are included in JSON payload."
-            )
         try:
-            # Update existing item
             item = items[item_id]
-            item |= item_data  # Use the update operator (Python 3.9+)
+            # Update item with new data
+            item.update(item_data)
             return item
         except KeyError:
             abort(404, message="Item not found")
@@ -51,27 +48,15 @@ class Item(MethodView):
 
 @blp.route("/item")
 class ItemList(MethodView):
+    
+    @blp.response(200, ItemSchema(many=True)) #turns into list
     def get(self):
-        """
-        Retrieve all items.
-        """
-        return {"items": list(items.values())}
-
-    def post(self):
-        """
-        Create a new item.
-        """
-        item_data = request.get_json()
-
-        # Validate input data
-        if (
-            "name" not in item_data
-            or "price" not in item_data
-            or "store_id" not in item_data
-        ):
-            abort(400, message="Item name, price, and store ID are required")
-
-        # Check for duplicate item in the same store
+        return items.values()
+    
+    @blp.arguments(ItemSchema)
+    @blp.response(201,ItemSchema)
+    def post(self, item_data):
+        # Check for duplicate items
         for item in items.values():
             if (
                 item_data["name"] == item["name"]

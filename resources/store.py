@@ -1,18 +1,16 @@
 import uuid
-from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from db import stores
+from schemas import StoreSchema
 
 # Blueprint for store operations
 blp = Blueprint("Stores", __name__, description="Operations on stores")
 
 @blp.route("/store/<string:store_id>")
 class Store(MethodView):
+    @blp.response(200,StoreSchema)
     def get(self, store_id):
-        """
-        Retrieve a store by its ID.
-        """
         try:
             return stores[store_id]
         except KeyError:
@@ -31,22 +29,19 @@ class Store(MethodView):
 
 @blp.route("/store")
 class StoreList(MethodView):
+    @blp.response(200,StoreSchema(many=True))
     def get(self):
         """
         Retrieve all stores.
         """
-        return {"stores": list(stores.values())}
-
-    def post(self):
+        return stores.values()
+    
+    @blp.arguments(StoreSchema)
+    @blp.response(201,StoreSchema)
+    def post(self, store_data):
         """
         Create a new store.
         """
-        store_data = request.get_json()
-
-        # Validate input data
-        if "name" not in store_data:
-            abort(400, message="Store name is required")
-
         # Check for duplicate store names
         for store in stores.values():
             if store_data["name"] == store["name"]:
