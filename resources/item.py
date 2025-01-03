@@ -1,8 +1,10 @@
-import uuid
 from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
-from db import items, stores
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+
+from db import db
+from models import ItemModel
 from schemas import ItemSchema, ItemUpdateSchema
 
 # Blueprint for item operations
@@ -10,67 +12,62 @@ blp = Blueprint("Items", __name__, description="Operations on items")
 
 @blp.route("/item/<string:item_id>")
 class Item(MethodView):
-    
     @blp.response(200, ItemSchema)
     def get(self, item_id):
-        """
-        Retrieve an item by its ID.
-        """
-        try:
-            return items[item_id]
-        except KeyError:
-            abort(404, message="Item not found")
+        # Fetch the item by ID
+        item = ItemModel.query.get_or_404(item_id)
+        return item  # Return the item serialized using the ItemSchema
 
     def delete(self, item_id):
-        """
-        Delete an item by its ID.
-        """
-        try:
-            del items[item_id]
-            return {"message": "Item Deleted"}
-        except KeyError:
-            abort(404, message="Item not found")
+        # Fetch and delete the item
+        item = ItemModel.query.get_or_404(item_id)
+        db.session.delete(item)
+        db.session.commit()
+        return {"message": "Item deleted"}, 200
 
     @blp.arguments(ItemUpdateSchema)
     @blp.response(200, ItemSchema)
     def put(self, item_data, item_id):
-        """
-        Update an existing item by its ID.
-        """
+        # Fetch the item by ID or create a new one if it doesn't exist
+        item = ItemModel.query.get(item_id)
+        if item:
+            # Update the existing item's attributes
+            item.name = item_data.get("name", item.name)
+            item.price = item_data.get("price", item.price)
+        else:
+            # Create a new item if it doesn't exist
+            item = ItemModel(id=item_id, **item_data)
+
         try:
-            item = items[item_id]
-            # Update item with new data
-            item.update(item_data)
-            return item
-        except KeyError:
-            abort(404, message="Item not found")
+            db.session.add(item)
+            db.session.commit()
+        except IntegrityError:
+            abort(400, message="Item with the same name already exists.")
+        except SQLAlchemyError:
+            abort(500, message="An error occurred while updating the item.")
+
+        return item
 
 
 @blp.route("/item")
 class ItemList(MethodView):
-    
-    @blp.response(200, ItemSchema(many=True)) #turns into list
+    @blp.response(200, ItemSchema(many=True))  # Returns a list of items
     def get(self):
-        return items.values()
-    
+        # Fetch and return all items
+        return ItemModel.query.all()
+
     @blp.arguments(ItemSchema)
-    @blp.response(201,ItemSchema)
+    @blp.response(201, ItemSchema)
     def post(self, item_data):
-        # Check for duplicate items
-        for item in items.values():
-            if (
-                item_data["name"] == item["name"]
-                and item_data["store_id"] == item["store_id"]
-            ):
-                abort(400, message="Item already exists.")
+        # Create a new item
+        item = ItemModel(**item_data)
 
-        # Check if the specified store exists
-        if item_data["store_id"] not in stores:
-            abort(404, message="Store not found")
-
-        # Generate a unique ID for the item
-        item_id = uuid.uuid4().hex
-        item = {**item_data, "id": item_id}
-        items[item_id] = item
+        try:
+            db.session.add(item)
+            db.session.commit()
+        except IntegrityError:
+            abort(400, message="An item with the same name already exists.")
+        except SQLAlchemyError:
+            abort(500, message="An error occurred while inserting the item.")
 
         return item, 201
