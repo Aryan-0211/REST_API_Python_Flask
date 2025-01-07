@@ -19,3 +19,5 @@ class ItemModel(db.Model):
         "StoreModel",
         back_populates="items"  # Matches the `items` attribute in the `StoreModel`
     )
+    
+    tags = db.relationship("TagModel", back_populates = "items", secondary = "item_tags")

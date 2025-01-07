@@ -4,8 +4,10 @@ from flask_smorest import Api
 from dotenv import load_dotenv
 from db import db
 import models
+
 from resources.item import blp as ItemBlueprint
 from resources.store import blp as StoreBlueprint
+from resources.tag import blp as TagBlueprint
 
 def create_app(db_url=None):
     # Load environment variables
@@ -36,9 +38,10 @@ def create_app(db_url=None):
     # Register blueprints
     api.register_blueprint(ItemBlueprint)
     api.register_blueprint(StoreBlueprint)
+    api.register_blueprint(TagBlueprint)
 
     return app
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5005, debug=True)

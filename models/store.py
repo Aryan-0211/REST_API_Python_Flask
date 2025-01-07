@@ -15,3 +15,9 @@ class StoreModel(db.Model):
         lazy="dynamic",          # Enables dynamic query building for related items
         cascade="all, delete",   # Automatically handle deletion of related items when a store is deleted
     )
+
+    tags = db.relationship(
+        "TagModel",
+        back_populates = "store",
+        lazy = "dynamic"
+    )
