@@ -5,7 +5,7 @@ class ItemTags(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.Integer, db.ForeignKey("items.id"))
-    tag_id = db.Column(db.Integer, db.ForeignKey("tags.id"))  # Corrected reference
+    tag_id = db.Column(db.Integer, db.ForeignKey("tags.id"))  
 
     # Optional: define relationships to make it easier to access related data
     item = db.relationship("ItemModel", backref="item_tags", lazy=True)
