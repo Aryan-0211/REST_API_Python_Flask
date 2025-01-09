@@ -1,6 +1,6 @@
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from flask_jwt_extended import jwt_required
 from db import db
 from models import TagModel, StoreModel, ItemModel
@@ -15,60 +15,78 @@ class TagsInStore(MethodView):
     def get(self, store_id):
         store = StoreModel.query.get_or_404(store_id)
 
-        return store.tags.all()  # lazy="dynamic" means 'tags' is a query
-    
+        if not store.tags:
+            abort(404, message="No tags found for the given store.")
+
+        return store.tags.all()  # Assumes lazy="dynamic" in StoreModel.tags
+
     @jwt_required()
     @blp.arguments(TagSchema)
     @blp.response(201, TagSchema)
     def post(self, tag_data, store_id):
-        if TagModel.query.filter(TagModel.store_id == store_id, TagModel.name == tag_data["name"]).first():
-            abort(400, message="A tag with that name already exists in that store.")
+        # Check if the store exists
+        store = StoreModel.query.get_or_404(store_id)
+
+        # Check for duplicate tag
+        if TagModel.query.filter_by(store_id=store_id, name=tag_data["name"]).first():
+            abort(400, message="A tag with that name already exists in this store.")
 
         tag = TagModel(**tag_data, store_id=store_id)
 
         try:
             db.session.add(tag)
             db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            abort(400, message="Tag creation failed due to a data integrity error.")
         except SQLAlchemyError as e:
-            abort(
-                500,
-                message=str(e),
-            )
+            db.session.rollback()
+            abort(500, message=f"An unexpected error occurred: {str(e)}")
 
         return tag
 
-@blp.route("/item/<int:item_id>/tag/<string:tag_id>")
+
+@blp.route("/item/<int:item_id>/tag/<int:tag_id>")
 class LinkTagsToItem(MethodView):
+    @jwt_required()
     @blp.response(201, TagSchema)
     def post(self, item_id, tag_id):
         item = ItemModel.query.get_or_404(item_id)
         tag = TagModel.query.get_or_404(tag_id)
 
+        # Check if the tag is already linked
+        if tag in item.tags:
+            abort(400, message="This tag is already associated with the item.")
+
         item.tags.append(tag)
 
         try:
-            db.session.add(item)
             db.session.commit()
-        except SQLAlchemyError:
-            abort(500, message="An error occurred while inserting the tag.")
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            abort(500, message=f"An error occurred while linking the tag: {str(e)}")
 
         return tag
-    
+
     @jwt_required()
     @blp.response(200, TagAndItemSchema)
     def delete(self, item_id, tag_id):
         item = ItemModel.query.get_or_404(item_id)
         tag = TagModel.query.get_or_404(tag_id)
 
+        # Ensure the tag is associated with the item
+        if tag not in item.tags:
+            abort(400, message="The tag is not associated with the specified item.")
+
         item.tags.remove(tag)
 
         try:
-            db.session.add(item)
             db.session.commit()
-        except SQLAlchemyError:
-            abort(500, message="An error occurred while inserting the tag.")
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            abort(500, message=f"An error occurred while unlinking the tag: {str(e)}")
 
-        return {"message": "Item removed from tag", "item": item, "tag": tag}
+        return {"message": "Tag removed from item.", "item": item, "tag": tag}
 
 
 @blp.route("/tag/<int:tag_id>")
@@ -78,6 +96,7 @@ class Tag(MethodView):
         tag = TagModel.query.get_or_404(tag_id)
         return tag
 
+    @jwt_required()
     @blp.response(
         202,
         description="Deletes a tag if no item is tagged with it.",
@@ -88,16 +107,18 @@ class Tag(MethodView):
         400,
         description="Returned if the tag is assigned to one or more items. In this case, the tag is not deleted.",
     )
-    
-    @jwt_required()
     def delete(self, tag_id):
         tag = TagModel.query.get_or_404(tag_id)
 
-        if not tag.items:
+        # Check if the tag is associated with any items
+        if tag.items:
+            abort(400, message="Tag cannot be deleted because it is associated with items.")
+
+        try:
             db.session.delete(tag)
             db.session.commit()
-            return {"message": "Tag deleted."}
-        abort(
-            400,
-            message="Could not delete tag. Make sure tag is not associated with any items, then try again.",
-        )
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            abort(500, message=f"An error occurred while deleting the tag: {str(e)}")
+
+        return {"message": "Tag deleted."}
