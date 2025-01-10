@@ -29,7 +29,7 @@ def create_app(db_url=None):
     app.config["OPENAPI_URL_PREFIX"] = "/"
     app.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger-ui"
     app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url or os.getenv("SQLALCHEMY_DATABASE_URI")
     #app.config["SQLALCHEMY_DATABASE_URI"] = db_url or os.getenv("DATABASE_URL", "sqlite:///data.db")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -99,6 +99,15 @@ def create_app(db_url=None):
             ),
             401,
         )
+    
+    @app.route('/health')
+    def health_check():
+        try:
+            # Try to query the database
+            db.session.execute('SELECT 1')
+            return jsonify({"status": "healthy"}), 200
+        except Exception as e:
+            return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
     # Register blueprints
     api.register_blueprint(ItemBlueprint)
@@ -110,4 +119,4 @@ def create_app(db_url=None):
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(host="0.0.0.0", port=5002, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
